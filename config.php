@@ -1,9 +1,9 @@
 <?php
-$host = getenv("DB_HOST");
-$db   = getenv("DB_NAME");
-$user = getenv("DB_USER");
-$pass = getenv("DB_PASS");
-$port = getenv("DB_PORT") ?: 3306;
+$host = getenv("asahi5000-mysql.wasmer.app");
+$db   = getenv("farmdb");
+$user = getenv("farmuser");
+$pass = getenv("Arca2020?");
+$port = getenv("3306") ?: 3306;
 
 $conn = new mysqli($host, $user, $pass, $db, $port);
 
