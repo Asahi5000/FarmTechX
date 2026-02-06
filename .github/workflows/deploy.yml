@@ -1,27 +1,24 @@
-name: Deploy to Wasmer
+name: Deploy FarmTechX
 
 on:
-push:
-branches:
-- main
+  push:
+    branches:
+      - main
 
 jobs:
-deploy:
-runs-on: ubuntu-latest
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-```
-steps:
-  - name: Checkout repo
-    uses: actions/checkout@v4
+      - name: Install Wasmer CLI
+        run: |
+          curl https://get.wasmer.io -sSfL | sh
+          echo "$HOME/.wasmer/bin" >> $GITHUB_PATH
 
-  - name: Install Wasmer CLI
-    run: |
-      curl https://get.wasmer.io -sSfL | sh
-      echo "$HOME/.wasmer/bin" >> $GITHUB_PATH
+      - name: Login to Wasmer
+        run: wasmer login --token ${{ secrets.WASMER_TOKEN }}
 
-  - name: Login to Wasmer
-    run: wasmer login --token ${{ secrets.WASMER_TOKEN }}
-
-  - name: Deploy App
-    run: wasmer deploy
-```
+      - name: Deploy
+        run: wasmer deploy
