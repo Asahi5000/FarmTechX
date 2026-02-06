@@ -1,5 +1,7 @@
 <?php
 session_start();
+echo "VERSION 2";
+
 ?>
 
 <!DOCTYPE html>
