@@ -1,10 +1,16 @@
 FROM php:8.2-apache
 
-RUN sed -i 's/80/8080/g' /etc/apache2/ports.conf \
- && sed -i 's/:80/:8080/g' /etc/apache2/sites-available/000-default.conf \
- && a2enmod rewrite
+# Install MySQL extensions
+RUN docker-php-ext-install mysqli pdo pdo_mysql
 
+# Enable Apache rewrite (for .htaccess if needed)
+RUN a2enmod rewrite
+
+# Copy project files
 COPY . /var/www/html/
+
+# Set permissions
 RUN chown -R www-data:www-data /var/www/html
 
-EXPOSE 8080
+# Expose web port
+EXPOSE 80
