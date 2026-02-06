@@ -2,9 +2,9 @@
 name = "php-asahi5000"
 
 [build]
-# Leave empty if using Dockerfile
+# Empty because we use Dockerfile
 command = ""
 
 [run]
-# This should match Dockerfile CMD
+# Must match Dockerfile CMD
 command = "php -S 0.0.0.0:8080 -t /app"
