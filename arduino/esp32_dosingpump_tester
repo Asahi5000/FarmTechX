@@ -1,0 +1,37 @@
+#define RELAY_A 13
+#define RELAY_B 12
+#define RELAY_C 14
+
+void setup() {
+  Serial.begin(115200);  // <-- This sets the baud rate
+  pinMode(RELAY_A, OUTPUT);
+  pinMode(RELAY_B, OUTPUT);
+  pinMode(RELAY_C, OUTPUT);
+  
+  digitalWrite(RELAY_A, HIGH); // OFF
+  digitalWrite(RELAY_B, HIGH); // OFF
+  digitalWrite(RELAY_C, HIGH); // OFF
+}
+
+void loop() {
+  // Turn on Pump A for 5 seconds
+  delay(3000);
+  Serial.println("Turning on Pump A");
+  digitalWrite(RELAY_A, LOW);  // ON
+  delay(3000);
+  digitalWrite(RELAY_A, HIGH); // OFF
+  Serial.println("Pump A off");
+
+  Serial.println("Turning on Pump B");
+  digitalWrite(RELAY_B, LOW);  // ON
+  delay(3000);
+  digitalWrite(RELAY_B, HIGH); // OFF
+  Serial.println("Pump B off");
+
+  Serial.println("Turning on Pump C");
+  digitalWrite(RELAY_C, LOW);  // ON
+  delay(3000);
+  digitalWrite(RELAY_C, HIGH); // OFF
+  Serial.println("Pump C off");
+
+}

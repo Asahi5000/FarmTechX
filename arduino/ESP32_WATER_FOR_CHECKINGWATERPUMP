@@ -1,0 +1,99 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+
+// ================= WIFI CONFIG =================
+const char* ssid = "Abanes_2.4g";
+const char* password = "Chijedjoydred20";
+
+// ================= SERVER =================
+const char* pumpURL = "http://192.168.1.2/FarmTechX/assets/php/api/pump-control.php";
+
+// ================= PUMP =================
+#define PUMP_SSR 13
+bool pumpState = false;
+
+// ================= SETUP =================
+void setup() {
+  Serial.begin(115200);
+
+  // Pump pin
+  pinMode(PUMP_SSR, OUTPUT);
+  digitalWrite(PUMP_SSR, LOW); // Pump OFF on boot
+
+  // Connect to WiFi
+  connectWiFi();
+}
+
+// ================= WIFI CONNECT =================
+void connectWiFi() {
+  if (WiFi.status() == WL_CONNECTED) return;
+
+  Serial.print("Connecting to WiFi");
+  WiFi.begin(ssid, password);
+
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    delay(500);
+    Serial.print(".");
+    attempts++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n✅ WiFi Connected!");
+    Serial.print("ESP32 IP: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\n❌ WiFi failed, will retry in loop.");
+  }
+}
+
+// ================= CHECK PUMP =================
+void checkPumpControl() {
+  if (WiFi.status() != WL_CONNECTED) {
+    connectWiFi();
+    return;
+  }
+
+  HTTPClient http;
+  http.begin(pumpURL);
+  int httpCode = http.GET();
+
+  if (httpCode == 200) {
+    String payload = http.getString();
+    Serial.print("Pump control payload: ");
+    Serial.println(payload);
+
+    // Parse JSON safely
+    DynamicJsonDocument doc(1024);
+    DeserializationError error = deserializeJson(doc, payload);
+    if (!error) {
+      const char* state = doc["state"];
+      if (strcmp(state, "OFF") == 0) {
+        digitalWrite(PUMP_SSR, HIGH);
+        pumpState = false;
+      } else {
+        digitalWrite(PUMP_SSR, LOW);
+        pumpState = true;
+      }
+    } else {
+      Serial.print("JSON parse error: ");
+      Serial.println(error.c_str());
+    }
+  } else {
+    Serial.print("HTTP error code: ");
+    Serial.println(httpCode);
+  }
+
+  http.end();
+}
+
+// ================= LOOP =================
+void loop() {
+  checkPumpControl();
+
+  Serial.print("Pump Status: ");
+  Serial.println(pumpState ? "ON" : "OFF");
+
+  delay(1000); // check every 1 seconds
+}

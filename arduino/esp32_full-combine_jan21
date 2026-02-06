@@ -1,0 +1,237 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include <EEPROM.h>
+
+// ================= PIN CONFIG =================
+#define ONE_WIRE_BUS 17
+#define TDS_PIN 34
+#define PH_PIN 36
+#define TDS_POWER 26
+#define CALIB_BUTTON 25
+#define PUMP_SSR 18
+
+#define RELAY_A 13
+#define RELAY_B 12
+#define RELAY_C 14
+
+// ================= WIFI CONFIG =================
+const char* ssid = "Abanes_2.4g";
+const char* password = "Chijedjoydred20";
+
+// ================= SERVER CONFIG =================
+const char* serverName   = "http://192.168.1.7/FarmTechX/assets/php/api/save-temp.php";
+const char* pumpURL      = "http://192.168.1.7/FarmTechX/assets/php/api/pump-control.php";
+const char* dosingURL    = "http://192.168.1.7/FarmTechX/assets/php/api/dosing-pump.php";
+
+// ================= EEPROM =================
+#define EEPROM_SIZE 64
+float tdsCalibration = 1.138;
+
+// ================= DS18B20 =================
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature DS18B20(&oneWire);
+
+// ================= GLOBAL =================
+float temperature, tdsValue, ecValue, phValue;
+bool pumpState = false;
+bool dosingPumps[3] = {false, false, false}; // A, B, C
+
+#define TDS_SAMPLES 5
+#define PH_SAMPLES 20
+
+// ================= PH CALIBRATION =================
+const float PH_SLOPE  = -14.12;
+const float PH_OFFSET = 30.96;
+
+// ================= WIFI CONNECT =================
+void connectWiFi() {
+  if (WiFi.status() == WL_CONNECTED) return;
+
+  Serial.print("Connecting to WiFi");
+
+  // Optional: static IP (change as needed)
+  // IPAddress localIP(192,168,1,50);
+  // IPAddress gateway(192,168,1,1);
+  // IPAddress subnet(255,255,255,0);
+  // IPAddress dns(8,8,8,8);
+  // WiFi.config(localIP, gateway, subnet, dns);
+
+  WiFi.begin(ssid, password);
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    delay(500);
+    Serial.print(".");
+    attempts++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n✅ WiFi Connected!");
+    Serial.print("ESP32 IP: ");
+    Serial.println(WiFi.localIP());
+
+    WiFi.setAutoReconnect(true);
+    WiFi.persistent(true);
+    WiFi.setSleep(false);
+  } else {
+    Serial.println("\n❌ WiFi failed, will retry...");
+  }
+}
+ 
+
+// ================= CHECK SSR PUMP =================
+void checkPumpControl() {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  HTTPClient http;
+  http.begin(pumpURL);
+  int httpCode = http.GET();
+
+  if (httpCode == 200) {
+    String payload = http.getString();
+    DynamicJsonDocument doc(256);
+    if (!deserializeJson(doc, payload)) {
+      const char* state = doc["state"];
+      if (strcmp(state, "ON") == 0) {
+        digitalWrite(PUMP_SSR, LOW);
+        pumpState = true;
+      } else {
+        digitalWrite(PUMP_SSR, HIGH);
+        pumpState = false;
+      }
+    }
+  }
+  http.end();
+}
+
+// ================= CHECK SINGLE DOSING PUMP =================
+bool checkSingleDosingPump(char pump) {
+  if (WiFi.status() != WL_CONNECTED) return false;
+
+  HTTPClient http;
+  String url = String(dosingURL) + "?pump=" + pump;
+  http.begin(url);
+  int httpCode = http.GET();
+
+  bool isOn = false;
+  if (httpCode == 200) {
+    String payload = http.getString();
+    DynamicJsonDocument doc(128);
+    if (!deserializeJson(doc, payload)) {
+      const char* state = doc["state"];
+      isOn = (strcmp(state, "ON") == 0);
+    }
+  }
+  http.end();
+  return isOn;
+}
+
+// ================= CHECK ALL DOSING PUMPS =================
+void checkDosingPumps() {
+  dosingPumps[0] = checkSingleDosingPump('A');
+  dosingPumps[1] = checkSingleDosingPump('B');
+  dosingPumps[2] = checkSingleDosingPump('C');
+
+  digitalWrite(RELAY_A, dosingPumps[0] ? LOW : HIGH);
+  digitalWrite(RELAY_B, dosingPumps[1] ? LOW : HIGH);
+  digitalWrite(RELAY_C, dosingPumps[2] ? LOW : HIGH);
+}
+
+// ================= SETUP =================
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(CALIB_BUTTON, INPUT_PULLUP);
+  pinMode(TDS_POWER, OUTPUT);
+  pinMode(PUMP_SSR, OUTPUT);
+  pinMode(RELAY_A, OUTPUT);
+  pinMode(RELAY_B, OUTPUT);
+  pinMode(RELAY_C, OUTPUT);
+
+  digitalWrite(TDS_POWER, LOW);
+  digitalWrite(PUMP_SSR, HIGH);
+  digitalWrite(RELAY_A, HIGH);
+  digitalWrite(RELAY_B, HIGH);
+  digitalWrite(RELAY_C, HIGH);
+
+  EEPROM.begin(EEPROM_SIZE);
+  EEPROM.get(0, tdsCalibration);
+  if (isnan(tdsCalibration) || tdsCalibration <= 0) tdsCalibration = 1.138;
+
+  analogReadResolution(12);
+  analogSetAttenuation(ADC_11db);
+
+  connectWiFi();
+  DS18B20.begin();
+}
+
+// ================= LOOP =================
+void loop() {
+  connectWiFi();
+  checkPumpControl();
+  checkDosingPumps(); // <-- now polls each pump individually
+
+  // ---------- TEMPERATURE ----------
+  DS18B20.requestTemperatures();
+  temperature = DS18B20.getTempCByIndex(0);
+
+  // ---------- TDS ----------
+  digitalWrite(TDS_POWER, HIGH);
+  delay(500);
+  float tdsSum = 0;
+  for (int i = 0; i < TDS_SAMPLES; i++) {
+    int raw = analogRead(TDS_PIN);
+    float voltage = raw * 3.3 / 4095.0;
+    float compensation = 1.0 + 0.02 * (temperature - 25.0);
+    float compensatedVoltage = voltage / compensation;
+    float tds = (133.42 * pow(compensatedVoltage, 3)
+               - 255.86 * pow(compensatedVoltage, 2)
+               + 857.39 * compensatedVoltage) * 0.5;
+    tdsSum += tds;
+    delay(50);
+  }
+  tdsValue = (tdsSum / TDS_SAMPLES) * tdsCalibration;
+  ecValue = tdsValue / 500.0;
+  digitalWrite(TDS_POWER, LOW);
+
+  // ---------- PH ----------
+  delay(500);
+  float phSum = 0;
+  for (int i = 0; i < PH_SAMPLES; i++) {
+    phSum += analogRead(PH_PIN) * 3.3 / 4095.0;
+    delay(50);
+  }
+  float voltageAvg = phSum / PH_SAMPLES;
+  phValue = PH_SLOPE * voltageAvg + PH_OFFSET;
+
+  // ---------- SERIAL ----------
+  Serial.println("=================================");
+  Serial.print("🌡 Temp: "); Serial.print(temperature); Serial.println(" °C");
+  Serial.print("💧 TDS: "); Serial.print(tdsValue); Serial.println(" ppm");
+  Serial.print("🌊 EC: "); Serial.print(ecValue); Serial.println(" mS/cm");
+  Serial.print("🧪 pH Voltage: "); Serial.println(voltageAvg, 3);
+  Serial.print("🧪 pH Value: "); Serial.println(phValue, 2);
+  Serial.print("🚰 Pump SSR: "); Serial.println(pumpState ? "ON" : "OFF");
+  Serial.print("💧 Dosing Pumps: A="); Serial.print(dosingPumps[0] ? "ON":"OFF");
+  Serial.print(" B="); Serial.print(dosingPumps[1] ? "ON":"OFF");
+  Serial.print(" C="); Serial.println(dosingPumps[2] ? "ON":"OFF");
+  Serial.println("=================================");
+
+  // ---------- SEND TO SERVER ----------
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(serverName);
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+    String postData = "temperature=" + String(temperature, 2) +
+                      "&tds=" + String(tdsValue, 2) +
+                      "&ec=" + String(ecValue, 2) +
+                      "&ph=" + String(phValue, 2);
+    http.POST(postData);
+    http.end();
+  }
+
+  delay(1500);
+}

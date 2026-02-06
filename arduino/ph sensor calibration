@@ -1,0 +1,17 @@
+#define PH_PIN 36
+
+void setup() {
+  Serial.begin(115200);
+}
+
+void loop() {
+  int raw = analogRead(PH_PIN);
+  float voltage = raw * 3.3 / 4095.0;
+
+  // Fine-tuned pH formula
+  float pH = -12.95 * voltage + 29.70;
+
+  Serial.print("Voltage: "); Serial.print(voltage, 3);
+  Serial.print(" | pH: "); Serial.println(pH, 2);
+
+  delay(1000);

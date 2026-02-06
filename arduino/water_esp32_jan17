@@ -1,0 +1,178 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include <EEPROM.h>
+
+// ================= PIN CONFIG =================
+#define ONE_WIRE_BUS 17
+#define TDS_PIN 34
+#define PH_PIN 36
+
+#define TDS_POWER 26     // NPN transistor for EC sensor
+#define PH_POWER 27      // NPN transistor for pH sensor
+#define CALIB_BUTTON 25  // Button to GND
+
+// ================= WIFI CONFIG =================
+const char* ssid = "Abanes_2.4g";
+const char* password = "Chijedjoydred20";
+
+// ================= SERVER CONFIG =================
+const char* serverName = "http://192.168.1.2/FarmTechX/assets/php/api/save-temp.php";
+
+// ================= EEPROM =================
+#define EEPROM_SIZE 64
+float calibrationFactor = 1.138; // default for 1382ppm solution
+
+// ================= DS18B20 =================
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature DS18B20(&oneWire);
+
+// ================= GLOBAL =================
+float temperature, tdsValue, ecValue, phValue;
+
+// =================================================
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(CALIB_BUTTON, INPUT_PULLUP);
+  pinMode(TDS_POWER, OUTPUT);
+  pinMode(PH_POWER, OUTPUT);
+
+  // Sensors OFF at start
+  digitalWrite(TDS_POWER, LOW);
+  digitalWrite(PH_POWER, LOW);
+
+  // EEPROM Init
+  EEPROM.begin(EEPROM_SIZE);
+  EEPROM.get(0, calibrationFactor);
+  if (isnan(calibrationFactor) || calibrationFactor <= 0) calibrationFactor = 1.138;
+
+  // WiFi
+  Serial.print("Connecting to WiFi");
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\n✅ WiFi Connected! IP: " + WiFi.localIP().toString());
+
+  DS18B20.begin();
+
+  Serial.println("=================================");
+  Serial.println(" Put probe in 1382ppm solution ");
+  Serial.println(" Press button to auto-calibrate ");
+  Serial.println("=================================");
+}
+
+// =================================================
+void loop() {
+
+  // ================= TEMPERATURE =================
+  DS18B20.requestTemperatures();
+  temperature = DS18B20.getTempCByIndex(0);
+
+  // ===================== pH READ =====================
+  digitalWrite(TDS_POWER, LOW);  // EC OFF
+  digitalWrite(PH_POWER, HIGH);  // pH ON
+  delay(1800);                    // warm-up
+
+  float phSum = 0;
+  for (int i = 0; i < 20; i++) {
+    phSum += analogRead(PH_PIN);
+    delay(20);
+  }
+  float rawPH = phSum / 20.0;
+  float phVoltage = rawPH * 3.3 / 4095.0;
+
+  // ✅ Calibrated pH formula (from your buffer readings)
+  phValue = -12.10 * phVoltage + 29.90;
+
+  digitalWrite(PH_POWER, LOW);   // pH OFF
+  delay(200);                     // water settle
+
+  // ===================== TDS / EC READ =====================
+  digitalWrite(PH_POWER, LOW);    // ensure pH OFF
+  digitalWrite(TDS_POWER, HIGH);  // EC ON
+  delay(800);                     // stabilize
+
+  int rawTDS = analogRead(TDS_PIN);
+  float voltage = rawTDS * 3.3 / 4095.0;
+
+  // Temperature compensation
+  float compensationCoefficient = 1.0 + 0.02 * (temperature - 25.0);
+  float compensatedVoltage = voltage / compensationCoefficient;
+
+  tdsValue = (133.42 * pow(compensatedVoltage, 3)
+            - 255.86 * pow(compensatedVoltage, 2)
+            + 857.39 * compensatedVoltage) * 0.5;
+
+  tdsValue *= calibrationFactor;
+  ecValue = tdsValue / 500.0;
+
+  digitalWrite(TDS_POWER, LOW);   // EC OFF
+  delay(500);                     // let water settle
+
+  // ================= AUTO CALIBRATION (TDS) =================
+  if (digitalRead(CALIB_BUTTON) == LOW) {
+    Serial.println("\n🔧 Starting TDS Calibration...");
+    delay(2000);
+
+    digitalWrite(TDS_POWER, HIGH);
+    delay(800);
+
+    float sum = 0;
+    for (int i = 0; i < 20; i++) {
+      int raw = analogRead(TDS_PIN);
+      float v = raw * 3.3 / 4095.0;
+      float cv = v / compensationCoefficient;
+
+      float tds = (133.42 * pow(cv, 3)
+                 - 255.86 * pow(cv, 2)
+                 + 857.39 * cv) * 0.5;
+
+      sum += tds;
+      delay(200);
+    }
+
+    digitalWrite(TDS_POWER, LOW);
+
+    float measuredTDS = sum / 20.0;
+    calibrationFactor = 1382.0 / measuredTDS;
+
+    EEPROM.put(0, calibrationFactor);
+    EEPROM.commit();
+
+    Serial.println("✅ TDS Calibration Complete!");
+    Serial.print("Measured TDS: "); Serial.println(measuredTDS);
+    Serial.print("New Calibration Factor: "); Serial.println(calibrationFactor);
+
+    delay(3000);
+  }
+
+  // ================= SERIAL OUTPUT =================
+  Serial.println("---------------------------------");
+  Serial.print("🌡 Temp: "); Serial.print(temperature); Serial.println(" °C");
+  Serial.print("💧 TDS: "); Serial.print(tdsValue); Serial.println(" ppm");
+  Serial.print("🌊 EC: "); Serial.print(ecValue); Serial.println(" mS/cm");
+  Serial.print("🧪 pH: "); Serial.println(phValue);
+  Serial.print("⚙ Cal Factor: "); Serial.println(calibrationFactor);
+  Serial.println("---------------------------------");
+
+  // ================= SEND TO SERVER =================
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(serverName);
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+    String postData = "temperature=" + String(temperature, 2) +
+                      "&tds=" + String(tdsValue, 2) +
+                      "&ec=" + String(ecValue, 2) +
+                      "&ph=" + String(phValue, 2);
+
+    http.POST(postData);
+    http.end();
+  }
+
+  delay(2000);
+}

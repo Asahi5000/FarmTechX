@@ -1,0 +1,95 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+
+// === PIN CONFIG ===
+#define ONE_WIRE_BUS 17   // DS18B20 data pin
+#define EC_PIN 34         // Analog pin for EC sensor
+#define PH_PIN 36         // Analog pin for pH sensor (use 35/36/32)
+
+// === WIFI CONFIG ===
+const char* ssid = "SSID6";          // WiFi SSID
+const char* password = "Chijedjoydred20";  // WiFi Password
+
+// === SERVER CONFIG ===
+const char* serverName = "http://192.168.1.6/FarmTechX/assets/php/api/save-temp.php";
+
+// === DS18B20 Setup ===
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature DS18B20(&oneWire);
+
+void setup() {
+  Serial.begin(115200);
+
+  // Connect to WiFi
+  Serial.print("Connecting to WiFi: ");
+  Serial.println(ssid);
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\n✅ WiFi Connected!");
+  Serial.print("ESP32 IP Address: ");
+  Serial.println(WiFi.localIP());
+
+  DS18B20.begin();
+}
+
+void loop() {
+  // === Read Temperature ===
+  DS18B20.requestTemperatures();
+  float tempC = DS18B20.getTempCByIndex(0);
+
+  // === Read EC Sensor ===
+  int rawEC = analogRead(EC_PIN);
+  float ecVoltage = (rawEC / 4095.0) * 3.3;  // Convert ADC to voltage (0-3.3V)
+  float ecValue = ecVoltage * 2.0;           // ⚠️ Replace with real EC calibration
+
+  // === Read pH Sensor ===
+  int rawPH = analogRead(PH_PIN);
+  float phVoltage = (rawPH / 4095.0) * 3.3;  // Convert ADC to voltage (0-3.3V)
+  float phValue = 7 + ((2.5 - phVoltage) / 0.18); 
+  // ⚠️ This is a common formula for pH sensors, adjust after calibration
+
+  // === Debug Output ===
+  Serial.print("🌡 Temp: ");
+  Serial.print(tempC);
+  Serial.print(" °C | 🌊 EC: ");
+  Serial.print(ecValue);
+  Serial.print(" mS/cm | 🧪 pH: ");
+  Serial.println(phValue);
+
+  // === Send Data to Server ===
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(serverName);
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+    // Send temperature + EC + pH
+    String postData = "temperature=" + String(tempC, 2) + 
+                      "&ec=" + String(ecValue, 2) + 
+                      "&ph=" + String(phValue, 2);
+
+    Serial.println("📤 Sending POST: " + postData);
+    int httpResponseCode = http.POST(postData);
+
+    if (httpResponseCode > 0) {
+      Serial.print("✅ HTTP Response code: ");
+      Serial.println(httpResponseCode);
+      String payload = http.getString();
+      Serial.println("📩 Server Response: " + payload);
+    } else {
+      Serial.print("❌ Error code: ");
+      Serial.println(httpResponseCode);
+    }
+    http.end();
+  } else {
+    Serial.println("⚠️ WiFi Disconnected. Reconnecting...");
+    WiFi.begin(ssid, password);
+  }
+
+  delay(1000); // every 1 second
+}

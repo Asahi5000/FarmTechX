@@ -1,0 +1,137 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+
+// WiFi credentials
+const char* ssid = "Abanes_2.4g";
+const char* password = "Chijedjoydred20";
+
+// Server API to send soil data
+const char* serverName = "http://192.168.1.9/FarmTechX/assets/php/api/save-soil.php";
+
+#define RXD2 26
+#define TXD2 27
+#define RE_DE 4
+
+HardwareSerial mod(2);
+byte resp[9];
+
+float moisture, temperature, ph, ec;
+
+void setup() {
+  Serial.begin(115200);
+  mod.begin(4800, SERIAL_8N1, RXD2, TXD2);
+
+  pinMode(RE_DE, OUTPUT);
+  digitalWrite(RE_DE, LOW);
+
+  connectWiFi();
+}
+
+void loop() {
+  // ===== Read soil sensor =====
+  moisture = temperature = ph = ec = 0;
+
+  if (readRegisters(0x01, 0x0000, 2, resp)) {
+    moisture = ((resp[3] << 8) | resp[4]) / 10.0;
+    int tempRaw = (resp[5] << 8) | resp[6];
+    temperature = (tempRaw > 0x7FFF) ? -(0x10000 - tempRaw) / 10.0 : tempRaw / 10.0;
+  }
+
+  if (readRegisters(0x01, 0x0002, 2, resp)) {
+    ph = ((resp[3] << 8) | resp[4]) / 100.0;
+    ec = ((resp[5] << 8) | resp[6]) / 100.0;
+  }
+
+  Serial.print("🌱 Moisture: "); Serial.print(moisture); Serial.println(" %RH");
+  Serial.print("🌡 Temp: "); Serial.print(temperature); Serial.println(" °C");
+  Serial.print("🧪 pH: "); Serial.println(ph, 2);
+  Serial.print("💧 EC: "); Serial.println(ec, 2);
+
+  // ===== Send to server =====
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(serverName);
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+    String postData = "moisture=" + String(moisture, 2) +
+                      "&temperature=" + String(temperature, 2) +
+                      "&ph=" + String(ph, 2) +
+                      "&ec=" + String(ec, 2);
+
+    int httpResponseCode = http.POST(postData);
+    if (httpResponseCode > 0) {
+      Serial.print("✅ Data sent, code: "); Serial.println(httpResponseCode);
+    } else {
+      Serial.print("❌ Error sending data: "); Serial.println(httpResponseCode);
+    }
+
+    http.end();
+  } else {
+    connectWiFi(); // reconnect if needed
+  }
+
+  delay(2000);
+}
+
+// ===== WiFi connect =====
+void connectWiFi() {
+  if (WiFi.status() == WL_CONNECTED) return;
+
+  Serial.print("Connecting to WiFi");
+  WiFi.begin(ssid, password);
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    delay(500);
+    Serial.print(".");
+    attempts++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("\n✅ WiFi Connected!");
+    Serial.print("IP: "); Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("\n❌ WiFi failed");
+  }
+}
+
+// ===== Modbus functions =====
+bool readRegisters(byte slaveID, uint16_t startReg, uint16_t numRegs, byte *response) {
+  byte req[8];
+  req[0] = slaveID;
+  req[1] = 0x03;
+  req[2] = startReg >> 8;
+  req[3] = startReg & 0xFF;
+  req[4] = numRegs >> 8;
+  req[5] = numRegs & 0xFF;
+  uint16_t crc = crc16(req, 6);
+  req[6] = crc & 0xFF;
+  req[7] = crc >> 8;
+
+  digitalWrite(RE_DE, HIGH);
+  delay(5);
+  mod.write(req, 8);
+  mod.flush();
+  digitalWrite(RE_DE, LOW);
+  delay(5);
+
+  unsigned long t = millis();
+  while (mod.available() < 9 && millis() - t < 1000) delay(1);
+
+  if (mod.available() >= 9) {
+    for (int i = 0; i < 9; i++) response[i] = mod.read();
+    return true;
+  }
+  return false;
+}
+
+uint16_t crc16(byte *buf, int len) {
+  uint16_t crc = 0xFFFF;
+  for (int pos = 0; pos < len; pos++) {
+    crc ^= buf[pos];
+    for (int i = 0; i < 8; i++) {
+      if (crc & 0x0001) crc = (crc >> 1) ^ 0xA001;
+      else crc >>= 1;
+    }
+  }
+  return crc;
+}

@@ -1,0 +1,91 @@
+#define RXD2 26
+#define TXD2 27
+#define RE_DE 4
+
+HardwareSerial mod(2);
+byte resp[9]; // response buffer for 2-register read
+
+void setup() {
+  Serial.begin(9600);
+  mod.begin(4800, SERIAL_8N1, RXD2, TXD2);
+
+  pinMode(RE_DE, OUTPUT);
+  digitalWrite(RE_DE, LOW);
+
+  Serial.println("ESP32 RS485 Soil Sensor Ready");
+}
+
+void loop() {
+  float moisture = 0, temperature = 0, ph = 0, ec = 0;
+
+  // ===== Read Moisture + Temperature =====
+  if (readRegisters(0x01, 0x0000, 2, resp)) {
+    moisture = ((resp[3] << 8) | resp[4]) / 10.0;
+    int tempRaw = (resp[5] << 8) | resp[6];
+    temperature = (tempRaw > 0x7FFF) ? -(0x10000 - tempRaw) / 10.0 : tempRaw / 10.0;
+  }
+
+  // ===== Read pH + EC =====
+  if (readRegisters(0x01, 0x0002, 2, resp)) {
+    ph = ((resp[3] << 8) | resp[4]) / 100.0; // divide by 100 or 10 depending on sensor
+    ec = ((resp[5] << 8) | resp[6]) / 100.0;
+  }
+
+  // ===== Print all values =====
+  Serial.print("🌱 Moisture: "); Serial.print(moisture); Serial.println(" %RH");
+  Serial.print("🌡 Temperature: "); Serial.print(temperature); Serial.println(" °C");
+  Serial.print("🧪 pH: "); Serial.println(ph, 2);
+  Serial.print("💧 EC: "); Serial.println(ec, 2);
+  Serial.println("------------------------");
+
+  delay(2000);
+}
+
+// ===== Function to send a Modbus request and read 2 registers =====
+bool readRegisters(byte slaveID, uint16_t startReg, uint16_t numRegs, byte *response) {
+  byte req[8];
+  req[0] = slaveID;           // Slave ID
+  req[1] = 0x03;              // Function code: Read Holding Registers
+  req[2] = startReg >> 8;     // Start address high byte
+  req[3] = startReg & 0xFF;   // Start address low byte
+  req[4] = numRegs >> 8;      // Number of registers high byte
+  req[5] = numRegs & 0xFF;    // Number of registers low byte
+
+  uint16_t crc = crc16(req, 6); // Calculate CRC
+  req[6] = crc & 0xFF;          // CRC Low
+  req[7] = crc >> 8;            // CRC High
+
+  // === Transmit ===
+  digitalWrite(RE_DE, HIGH);
+  delay(5);
+  mod.write(req, 8);
+  mod.flush();
+
+  // === Receive ===
+  digitalWrite(RE_DE, LOW);
+  delay(5);
+
+  unsigned long t = millis();
+  while (mod.available() < 9 && millis() - t < 1000) delay(1);
+
+  if (mod.available() >= 9) {
+    for (int i = 0; i < 9; i++) response[i] = mod.read();
+    return true;
+  } else {
+    Serial.println("❌ No response or incomplete frame");
+    return false;
+  }
+}
+
+// ===== CRC16 for Modbus =====
+uint16_t crc16(byte *buf, int len) {
+  uint16_t crc = 0xFFFF;
+  for (int pos = 0; pos < len; pos++) {
+    crc ^= buf[pos];
+    for (int i = 8; i != 0; i--) {
+      if (crc & 0x0001) crc = (crc >> 1) ^ 0xA001;
+      else crc >>= 1;
+    }
+  }
+  return crc;
+}

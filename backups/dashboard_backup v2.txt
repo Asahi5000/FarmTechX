@@ -1,0 +1,212 @@
+<?php
+require '../authenticator.php';
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>FarmTechX Admin Dashboard</title>
+    <link rel="stylesheet" href="../assets/css/styles.css" />
+    <link rel="stylesheet" href="../assets/css/sensors.css" />
+    <link rel="stylesheet" href="../assets/css/switch.css" />
+    <link rel="icon" href="../assets/images/FarmTechX.jpg" />
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+</head>
+
+
+<body>
+    <div class="main-container">
+      <?php include '../assets/php/hamburder-menu.php'; ?>      
+      <?php include '../assets/php/sidebar-dashboard.php'; ?>
+        
+      <main class="main-content">
+            
+        <div class="content-wrapper">
+          <?php include '../assets/php/welcome-card-dashboard.php'; ?>
+                
+          <section>
+            <h2 class="sensors-title">Sensors</h2>
+                    
+            
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+            <div class="cards">
+              <div class="card">🌡 Water Temperature: <span id="tempValue">--</span></div>
+              <div class="card">💧 Electric Conductivity(EC): <span id="ecValue">--</span></div>
+              <div class="card">🧪 Potential Hydrogen(pH): <span id="phValue">--</span></div>
+              <div class="card"><span id="lastUpdate">Updated: --</span></div>
+            </div>
+
+            <div class="Graph-title">
+              <h2>Sensors Graph</h2>
+            </div>
+
+            <canvas id="sensorChart"></canvas>
+              <div class="plot-section">
+                <h3 class="plot-title">Probe 1</h3>
+                <h4 class="soil-tester-title">Soil Reading</h4>
+              <div class="sensor-grid">
+                  
+              <div class="sensor-card">
+                <div class="sensor-value">--</div>
+                <div class="sensor-label">EC Meter</div>
+              </div>
+
+              <div class="sensor-card">
+                <div class="sensor-value">--</div>
+                <div class="sensor-label">pH Meter</div>
+              </div>
+                
+              <div class="sensor-card">
+                <div class="sensor-value">--</div>
+                <div class="sensor-label">Soil Moisture</div>
+              </div>
+              </div>
+                        
+              <button class="add-plot-btn">Add Probe</button>
+            </div>
+          </section>
+
+
+
+      <section>
+        <h2 class="sensors-title">Water Pump Control</h2>
+
+
+    <h3>Automation Mode - Water Pump</h3>
+
+    <!-- Pump Status Switch -->
+    <div class="status-switch">
+      <label class="switch">
+        <input type="checkbox" id="pumpSwitch">
+        <span class="slider"></span>
+      </label>
+      <span class="status-label" id="pumpStatus">OFF</span>
+    </div>
+
+    <!-- Automation Form -->
+    <form class="automation-form" id="automationForm">
+      <div class="form-group">
+        <label for="valve">Select Valve</label>
+        <select id="valve" required>
+          <option value="">-- Choose Valve --</option>
+          <option value="1">Valve 1</option>
+          <option value="2">Valve 2</option>
+          <option value="3">Valve 3</option>
+          <option value="4">Valve 4</option>
+          <option value="5">Valve 5</option>
+          <option value="6">Valve 6</option>
+          <option value="7">Valve 7</option>
+          <option value="8">Valve 8</option>
+          <option value="9">Valve 9</option>
+          <option value="10">Valve 10</option>
+          <option value="11">Valve 11</option>
+          <option value="12">Valve 12</option>
+          <option value="13">Valve 13</option>
+          <option value="14">Valve 14</option>
+          <option value="15">Valve 15</option>
+          <option value="16">Valve 16</option>
+        </select>
+      </div>
+
+<div class="form-group">
+  <label for="hour">Select Time</label>
+  <div class="time-select">
+    <select id="hour" required>
+      <option value="">Hour</option>
+      <!-- Hours 1 to 12 -->
+      <option value="01">01</option>
+      <option value="02">02</option>
+      <option value="03">03</option>
+      <option value="04">04</option>
+      <option value="05">05</option>
+      <option value="06">06</option>
+      <option value="07">07</option>
+      <option value="08">08</option>
+      <option value="09">09</option>
+      <option value="10">10</option>
+      <option value="11">11</option>
+      <option value="12">12</option>
+    </select>
+
+    <select id="minute" required>
+      <option value="">Min</option>
+      <option value="00">00</option>
+      <option value="30">30</option>
+    </select>
+
+    <select id="ampm" required>
+      <option value="AM">AM</option>
+      <option value="PM">PM</option>
+    </select>
+  </div>
+</div>
+
+
+      <div class="form-group">
+        <label for="duration">Duration (minutes)</label>
+        <input type="number" id="duration" min="1" required>
+      </div>
+
+      <div class="form-group">
+        <label for="ph">Adjust pH Level</label>
+        <input type="number" id="ph" step="0.1" min="0" max="14" required>
+      </div>
+
+      <button type="submit">Save Schedule</button>
+    </form>
+
+    <!-- Schedule List -->
+    <div class="schedule-list">
+      <h3>Schedule List</h3>
+      <table id="scheduleTable">
+        <thead>
+          <tr>
+            <th>Valve</th>
+            <th>Time</th>
+            <th>Duration</th>
+            <th>pH Level</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Schedules will appear here -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+      </section>
+
+        </div>
+        
+      </main>
+      
+    </div>
+
+
+
+
+
+<script src="../assets/script/dashboardSwitch.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="../assets/script/fetchDashboardSensors.js"></script>
+
+<script src="../assets/script/activeLink.js"></script>
+<script src="../assets/script/navClicks.js"></script>
+<script src="../assets/script/closeSidebar.js"></script>
+<script src="../assets/script/toggleSidebar.js"></script>
+<script src="../assets/script/addPlot.js"></script>
+<script src="../assets/script/preventCache.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,496 @@
+    /* ====== SWITCH SECTION ====== */
+    .switch-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: white;
+      padding: 10px 20px;
+      margin-bottom: 20px;
+      border-radius: 10px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    .switch-label {
+      font-size: 18px;
+      font-weight: bold;
+      color: #28a745;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 70px;
+      height: 34px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 34px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 28px;
+      width: 28px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #28a745;
+    }
+    input:checked + .slider:before {
+      transform: translateX(36px);
+    }
+
+    /* ====== SECTIONS ====== */
+    .section {
+      background: white;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 12px;
+      box-shadow: 0px 2px 6px rgba(0,0,0,0.1);
+    }
+    .section h2 {
+      color: #28a745;
+      margin-bottom: 15px;
+    }
+
+    /* ====== MANUAL MODE ====== */
+    .valves-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 15px;
+    }
+    .valve {
+      padding: 15px;
+      background: #f9f9f9;
+      border: 2px solid #28a745;
+      border-radius: 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: 0.3s;
+      position: relative;
+    }
+    .valve.on {
+      background: #28a745;
+      color: white;
+    }
+    .indicator {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-left: 8px;
+      background: red;
+    }
+    .valve.on .indicator {
+      background: lime;
+    }
+
+    /* Pump Control */
+    .pump-control {
+      margin-top: 20px;
+      text-align: center;
+    }
+    #pumpToggle {
+      padding: 10px 20px;
+      background: #28a745;
+      border: none;
+      border-radius: 8px;
+      color: white;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    #pumpToggle:hover {
+      background: #218838;
+    }
+    #pumpStatus {
+      font-weight: bold;
+      color: #28a745;
+    }
+
+    /* Pump Duration */
+    .pump-duration {
+      margin-top: 15px;
+    }
+    .pump-duration label {
+      font-weight: bold;
+      color: #333;
+      margin-right: 10px;
+    }
+    .pump-duration input {
+      width: 80px;
+      padding: 6px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+
+    /* pH & EC Controls */
+    .ph-control, .ec-control {
+      margin-top: 20px;
+      padding: 15px;
+      border: 1px solid #28a745;
+      border-radius: 10px;
+    }
+    .ph-control input[type=range],
+    .ec-control input[type=range] {
+      width: 100%;
+    }
+    .ph-value, .ec-value {
+      font-weight: bold;
+      color: #28a745;
+    }
+
+    /* ====== AUTOMATION MODE ====== */
+    .automation-form {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      padding-right: 10px;
+    }
+    .automation-form label {
+      font-weight: bold;
+      color: #333;
+    }
+    .automation-form select, .automation-form input {
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+    }
+    .automation-form button {
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      background: #28a745;
+      color: white;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+    .automation-form button:hover {
+      background: #218838;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      padding: 10px;
+      border: 1px solid #ddd;
+      text-align: center;
+    }
+    th {
+      background: #28a745;
+      color: white;
+    }
+    .action-btn {
+      background: #dc3545;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 6px;
+      color: white;
+      cursor: pointer;
+    }
+    .action-btn.edit {
+      background: #007bff;
+      margin-right: 5px;
+    }
+
+    /* Time Select */
+    .time-select {
+      display: flex;
+      gap: 10px;
+    }
+    .time-select select {
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+
+
+    /* Container styling */
+.dosing-panel {
+  max-width: 500px;
+  margin: 20px auto;
+  padding: 20px;
+  background: linear-gradient(180deg, #35b665 0%, #217F44 100%);
+  border-radius: 16px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+  color: #e5e7eb;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+/* Each pump row */
+.dosing-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: #ffffff;
+  border-radius: 12px;
+}
+
+/* Duration input */
+.dosing-row input[type="number"] {
+  width: 90px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #ffffff;
+  color: #000000;
+  font-size: 15px;
+}
+
+.dosing-row input[type="number"]:focus {
+  outline: none;
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56,189,248,0.3);
+}
+
+/* Button */
+.dosing-row button {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #31a34a;
+  color: white;
+  transition: all 0.25s ease;
+}
+
+.dosing-row button:hover:not(:disabled) {
+  background: #28a745;
+  transform: translateY(-1px);
+}
+
+.dosing-row button:disabled {
+  background: #475569;
+  cursor: not-allowed;
+}
+
+/* Pump status */
+.pump-status {
+  font-weight: bold;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  text-align: center;
+  min-width: 60px;
+}
+
+/* Main Water Pump */
+.pump-on {
+  background-color: green;
+  color: white;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.pump-off {
+  background-color: red;
+  color: white;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Dosing Pumps */
+.dosingpump-on {
+  background-color: green;
+  color: white;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.dosingpump-off {
+  background-color: red;
+  color: white;
+  font-weight: bold;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid #ccc;
+  border-top: 2px solid #2ecc71;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+  margin-left: 6px;
+}
+
+.hidden {
+  display: none;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ===== Pump & Dosing Input Styling ===== */
+/* Pump Duration */
+.pump-duration {
+  margin-top: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pump-duration label {
+  font-weight: 600;
+  color: #333;
+}
+
+.pump-duration input[type="number"] {
+  width: 70px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  text-align: center;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.pump-duration input[type="number"]:focus {
+  outline: none;
+  border-color: #007BFF;
+  box-shadow: 0 0 5px rgba(0,123,255,0.3);
+}
+
+/* Seconds input smaller */
+.pump-duration input[type="number"]#mainPumpDurationSec,
+.dosing-row input[type="number"][id$="Sec"] {
+  width: 50px;
+}
+
+/* Pump timer */
+.pump-timer,
+#pumpTimer {
+  font-weight: bold;
+  color: red;
+  min-width: 50px;
+  text-align: center;
+}
+
+/* Dosing row styling */
+.dosing-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: #ffffff;
+  border-radius: 10px;
+}
+
+.dosing-row input[type="number"] {
+  width: 60px;
+  padding: 6px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  text-align: center;
+}
+
+.dosing-row input[type="number"]:focus {
+  border-color: #007BFF;
+  box-shadow: 0 0 5px rgba(0,123,255,0.3);
+}
+
+/* Main Pump Duration Styling - Centered */
+.mainpump-duration {
+  display: flex;
+  align-items: center;
+  justify-content: center; /* center horizontally */
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 15px 0;
+}
+
+.mainpump-duration label {
+  font-weight: 600;
+  color: #333;
+}
+
+.mainpump-duration input[type="number"] {
+  width: 70px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  text-align: center;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.mainpump-duration input[type="number"]:focus {
+  outline: none;
+  border-color: #007BFF;
+  box-shadow: 0 0 5px rgba(0,123,255,0.3);
+}
+
+/* Seconds input slightly smaller */
+.mainpump-duration input#mainPumpDurationSec {
+  width: 50px;
+}
+
+
+/* Modal styles */
+.modal {
+  display: none; 
+  position: fixed;
+  z-index: 999;
+  left: 0; top: 0;
+  width: 100%; height: 100%;
+  background-color: rgba(0,0,0,0.5);
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  max-width: 400px;
+  width: 90%;
+  text-align: center;
+}
+
+.modal-buttons {
+  margin-top: 20px;
+  display: flex;
+  justify-content: space-around;
+}
+
+.modal-buttons .btn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.btn-danger { background: #e74c3c; color: #fff; }
+.btn-secondary { background: #7f8c8d; color: #fff; }

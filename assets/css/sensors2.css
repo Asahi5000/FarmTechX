@@ -1,0 +1,181 @@
+/* ===== CARDS SECTION ===== */
+.cards {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+gap: 15px;
+margin-bottom: 25px;
+}
+
+.card {
+background: #ffffff;
+color: #2e2e2e;
+padding: 15px;
+border-radius: 10px;
+text-align: center;
+font-size: 16px;
+font-weight: 500;
+box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+border: 1px solid rgba(0, 128, 0, 0.2);
+transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.card:hover {
+transform: translateY(-3px);
+border-color: #008000;
+}
+
+/* ===== SENSOR CHART ===== */
+  #sensorChart {
+    width: 100% !important;      /* Full width almost */
+    max-width: 100%;           /* Max for large screens */
+    height: 400px;              /* Default height */
+    margin: 20px auto;
+    background: #e6f5e6;        /* Light green background */
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0,128,0,0.2);
+    padding: 10px;
+  }
+
+/* ===== PLOT SECTION ===== */
+.plot-section {
+background: #ffffff;
+padding: 20px;
+border-radius: 12px;
+margin-top: 25px;
+box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+border: 1px solid rgba(0, 128, 0, 0.15);
+}
+
+.plot-title {
+font-size: 20px;
+font-weight: 600;
+color: #008000;
+margin-bottom: 5px;
+}
+
+.soil-tester-title {
+font-size: 14px;
+color: #555;
+margin-bottom: 15px;
+}
+
+/* ===== SENSOR GRID ===== */
+.sensor-grid {
+display: grid;
+grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+gap: 15px;
+margin-bottom: 20px;
+}
+
+.sensor-card {
+background: #f9f9f9;
+padding: 15px;
+border-radius: 10px;
+text-align: center;
+border: 1px solid rgba(0, 128, 0, 0.15);
+transition: border 0.2s ease, transform 0.2s ease;
+}
+
+.sensor-card:hover {
+border-color: #008000;
+transform: scale(1.03);
+}
+
+.sensor-value {
+font-size: 22px;
+font-weight: bold;
+color: #008000;
+margin-bottom: 8px;
+}
+
+.sensor-values {
+  margin: 20px auto;
+  font-size: 16px;
+  color: #006400;
+}
+.sensor-label {
+font-size: 13px;
+color: #666;
+}
+
+/* ===== BUTTON ===== */
+.add-plot-btn {
+display: inline-block;
+padding: 10px 18px;
+font-size: 14px;
+border: none;
+border-radius: 8px;
+background: #008000;
+color: #fff;
+font-weight: 600;
+cursor: pointer;
+transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.add-plot-btn:hover {
+background: #006400;
+transform: translateY(-2px);
+}
+
+.Graph-title h2{
+    font-size: 30px;
+    font-weight: 500;
+    color: #217f44;
+    margin: 25px 0 15px 0;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 600px) {
+.card {
+font-size: 14px;
+padding: 12px;
+}
+.chartjs-legend li {
+  font-size: 11px !important;
+  padding: 2px 6px !important;
+}
+
+.chartjs-legend span {
+  width: 10px !important;
+  height: 10px !important;
+  margin-right: 4px !important;
+}
+.sensor-grid {
+grid-template-columns: 1fr;
+}
+}
+/* ===== SENSOR CHART (Mobile) ===== */
+@media (max-width: 768px) {
+  #sensorChart { display: none !important; }
+
+  /* Chart.js text elements */
+  #sensorChart canvas {
+    font-size: 12px !important; /* shrink labels & ticks */
+  }
+
+  .chartjs-legend li {
+    font-size: 6px !important; /* legend text smaller */
+    padding: 2px 6px !important;
+  }
+
+  .card {
+    font-size: 16px !important;
+  }
+  .card span {
+    font-size: 14px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  @media (max-width: 480px) {
+    #sensorChart { height: 300px; }
+  }
+
+  #sensorChart canvas {
+    font-size: 10px !important; /* even smaller for phones */
+  }
+
+  .chartjs-legend li {
+    font-size: 10px !important;
+  }
+}

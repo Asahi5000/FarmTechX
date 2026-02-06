@@ -1,0 +1,54 @@
+// Handle schedule form submission
+document.getElementById("scheduleForm").addEventListener("submit", function (e) {
+  e.preventDefault();
+
+  const valve = document.getElementById("valve").value;
+  const hour = document.getElementById("hour").value;
+  const minute = document.getElementById("minute").value;
+  const ampm = document.getElementById("ampm").value;
+  const duration = document.getElementById("duration").value;
+
+  if (!hour || !minute || !ampm) {
+    alert("Please select a valid time.");
+    return;
+  }
+
+  const time = `${hour}:${minute} ${ampm}`;
+
+  addSchedule(valve, time, duration, "Active");
+
+  this.reset();
+});
+
+// Function to add schedule row in table
+function addSchedule(valve, time, duration, status) {
+  const tableBody = document.querySelector("#scheduleTable tbody");
+
+  const row = document.createElement("tr");
+
+  row.innerHTML = `
+    <td>${valve}</td>
+    <td>${time}</td>
+    <td>${duration} mins</td>
+    <td>${status}</td>
+    <td>
+      <button class="edit-btn">Edit</button>
+      <button class="delete-btn">Delete</button>
+    </td>
+  `;
+
+  // Delete button action
+  row.querySelector(".delete-btn").addEventListener("click", () => {
+    row.remove();
+  });
+
+  // Edit button action
+  row.querySelector(".edit-btn").addEventListener("click", () => {
+    const newDuration = prompt("Enter new duration (mins):", duration);
+    if (newDuration && !isNaN(newDuration)) {
+      row.cells[2].innerText = `${newDuration} mins`;
+    }
+  });
+
+  tableBody.appendChild(row);
+}

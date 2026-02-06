@@ -1,0 +1,172 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+
+// ===== WiFi Credentials =====
+const char* ssid = "Abanes_2.4g";
+const char* password = "Chijedjoydred20";
+
+// ===== Server APIs =====
+const char* soilServer = "http://192.168.1.9/FarmTechX/assets/php/api/soil-save.php";
+const char* rainServer = "http://192.168.1.9/FarmTechX/assets/php/api/rain-save.php";
+
+// ===== RS485 Pins =====
+#define RXD2 26
+#define TXD2 27
+#define RE_DE 4
+
+HardwareSerial mod(2);
+byte resp[9];
+
+// ===== Soil Data =====
+float moisture = 0, temperature = 0, ph = 0, ec = 0;
+
+// ===== Rain Sensor =====
+#define RAIN_DO_PIN 33
+#define RAIN_AO_PIN 32
+bool isRaining = false;
+int rainIntensity = 0;
+
+// ===== Sensor ID =====
+#define SENSOR_ID 2
+
+void setup() {
+  Serial.begin(115200);
+
+  // RS485
+  mod.begin(4800, SERIAL_8N1, RXD2, TXD2);
+  pinMode(RE_DE, OUTPUT);
+  digitalWrite(RE_DE, LOW);
+
+  // Rain sensor
+  pinMode(RAIN_DO_PIN, INPUT);
+  pinMode(RAIN_AO_PIN, INPUT);
+
+  connectWiFi();
+  Serial.println("🌱 ESP32 Soil + Rain Sensor Started");
+}
+
+void loop() {
+  moisture = temperature = ph = ec = 0;
+
+  // ===== Read Soil Sensor =====
+  if (readRegisters(0x01, 0x0000, 2, resp)) {
+    moisture = ((resp[3] << 8) | resp[4]) / 10.0;
+    int tempRaw = (resp[5] << 8) | resp[6];
+    temperature = (tempRaw > 0x7FFF)
+                  ? -(0x10000 - tempRaw) / 10.0
+                  : tempRaw / 10.0;
+  }
+
+  if (readRegisters(0x01, 0x0002, 2, resp)) {
+    ph = ((resp[3] << 8) | resp[4]) / 100.0;
+    ec = ((resp[5] << 8) | resp[6]) / 100.0;
+  }
+
+  // ===== Read Rain Sensor =====
+  isRaining = digitalRead(RAIN_DO_PIN) == LOW;
+  rainIntensity = analogRead(RAIN_AO_PIN);
+  int rainAnalog = map(rainIntensity, 0, 4095, 0, 1023);
+
+  // ===== Debug Output =====
+  Serial.printf(
+    "🌱 Moisture: %.2f | 🌡 Temp: %.2f | 🧪 pH: %.2f | 💧 EC: %.2f | 🌧 Rain: %s | Intensity: %d\n",
+    moisture, temperature, ph, ec,
+    isRaining ? "YES" : "NO", rainAnalog
+  );
+
+  // ===== Send Soil Data =====
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(soilServer);
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+    String soilData =
+      "sensor_id=" + String(SENSOR_ID) +
+      "&moisture=" + String(moisture, 2) +
+      "&temperature=" + String(temperature, 2) +
+      "&ph=" + String(ph, 2) +
+      "&ec=" + String(ec, 2);
+
+    int soilCode = http.POST(soilData);
+    Serial.printf("✅ Soil sent: %d\n", soilCode);
+    http.end();
+  }
+
+  // ===== Send Rain Data =====
+  if (WiFi.status() == WL_CONNECTED) {
+    HTTPClient http;
+    http.begin(rainServer);
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+
+    String rainData =
+      "sensor_id=" + String(SENSOR_ID) +
+      "&rain=" + String(isRaining ? 1 : 0) +
+      "&rain_intensity=" + String(rainAnalog);
+
+    int rainCode = http.POST(rainData);
+    Serial.printf("🌧 Rain sent: %d\n", rainCode);
+    http.end();
+  } else {
+    connectWiFi();
+  }
+
+  delay(2000);
+}
+
+// ===== WiFi Connection =====
+void connectWiFi() {
+  if (WiFi.status() == WL_CONNECTED) return;
+
+  Serial.print("Connecting WiFi");
+  WiFi.begin(ssid, password);
+
+  int attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+    delay(500);
+    Serial.print(".");
+    attempts++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED)
+    Serial.println("\n✅ WiFi Connected");
+  else
+    Serial.println("\n❌ WiFi Failed");
+}
+
+// ===== Modbus Read =====
+bool readRegisters(byte slaveID, uint16_t startReg, uint16_t numRegs, byte *response) {
+  byte req[8];
+  req[0] = slaveID;
+  req[1] = 0x03;
+  req[2] = startReg >> 8;
+  req[3] = startReg & 0xFF;
+  req[4] = numRegs >> 8;
+  req[5] = numRegs & 0xFF;
+
+  uint16_t crc = 0xFFFF;
+  for (int pos = 0; pos < 6; pos++) {
+    crc ^= req[pos];
+    for (int i = 0; i < 8; i++) {
+      crc = (crc & 1) ? (crc >> 1) ^ 0xA001 : crc >> 1;
+    }
+  }
+
+  req[6] = crc & 0xFF;
+  req[7] = crc >> 8;
+
+  digitalWrite(RE_DE, HIGH);
+  delay(5);
+  mod.write(req, 8);
+  mod.flush();
+  digitalWrite(RE_DE, LOW);
+  delay(5);
+
+  unsigned long t = millis();
+  while (mod.available() < 9 && millis() - t < 1000) delay(1);
+
+  if (mod.available() >= 9) {
+    for (int i = 0; i < 9; i++) response[i] = mod.read();
+    return true;
+  }
+  return false;
+}

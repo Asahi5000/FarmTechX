@@ -1,0 +1,233 @@
+
+:root {
+  --green-main: #198754;      /* Bootstrap green */
+  --green-dark: #146c43;
+  --green-light: #e6f4ec;
+}
+
+/* Filter container */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+/* Filter buttons */
+.filter-btn {
+  background-color: var(--green-light);
+  color: var(--green-main);
+  border: 1px solid var(--green-main);
+  min-width: 90px;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.filter-btn:hover {
+  background-color: var(--green-main);
+  color: #fff;
+}
+
+/* Active filter (optional JS class) */
+.filter-btn.active {
+  background-color: var(--green-main);
+  color: #fff;
+  border-color: var(--green-dark);
+}
+
+/* Date inputs */
+.filter-bar input[type="date"] {
+  max-width: 180px;
+  font-size: 0.9rem;
+  border: 1px solid var(--green-main);
+}
+
+.filter-bar input[type="date"]:focus {
+  border-color: var(--green-dark);
+  box-shadow: 0 0 0 0.15rem rgba(25, 135, 84, 0.25);
+}
+
+/* Apply Range button */
+#applyRange {
+  background-color: var(--green-main);
+  border-color: var(--green-main);
+  white-space: nowrap;
+}
+
+#applyRange:hover {
+  background-color: var(--green-dark);
+  border-color: var(--green-dark);
+}
+
+.filter-bar .btn-primary {
+  background-color: var(--green-main) !important;
+  border-color: var(--green-main) !important;
+}
+
+.filter-bar .btn-primary:hover {
+  background-color: var(--green-dark) !important;
+  border-color: var(--green-dark) !important;
+}
+
+/* Force background when btn + btn-primary + filter-btn are combined */
+.filter-bar .btn.filter-btn,
+.filter-bar .btn-primary.filter-btn {
+  background-color: var(--green-light);
+  color: var(--green-main);
+  border-color: var(--green-main);
+}
+
+.filter-bar .btn-primary.filter-btn:hover,
+.filter-bar .btn.filter-btn:hover {
+  background-color: var(--green-main);
+  color: #fff;
+}
+
+/* ---------- Mobile Optimization ---------- */
+@media (max-width: 576px) {
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-btn,
+  #applyRange,
+  .filter-bar input[type="date"] {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .filter-btn {
+    font-size: 1rem;
+    padding: 0.6rem;
+  }
+}
+
+
+
+/* Pagination container */
+#pagination {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Pagination buttons */
+#pagination button {
+  background-color: #217F44;
+  color: white;
+  border: 1px solid #16ce06;
+  padding: 5px 10px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.2s, color 0.2s;
+}
+
+/* Hover effect */
+#pagination button:hover:not(:disabled) {
+  background-color: #333;
+}
+
+/* Active page */
+#pagination button.active {
+  background-color: white;
+  color: black;
+  font-weight: bold;
+}
+
+/* Disabled buttons */
+#pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+#sensorTable {
+
+
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+/* ==================== GREEN THEME ==================== */
+
+/* Buttons */
+.btn, .page-btn {
+  background-color: #28a745;   /* Bootstrap green */
+  border-color: #28a745;
+  color: #fff;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.btn:hover, .page-btn:hover {
+  background-color: #218838;
+  border-color: #1e7e34;
+  color: #fff;
+}
+
+.btn.active, .page-btn.active {
+  background-color: #1e7e34;
+  border-color: #1c7430;
+}
+
+/* Filter bar buttons */
+.filter-bar .filter-btn {
+  background-color: #28a745;
+  color: #fff;
+}
+
+.filter-bar .filter-btn.active {
+  background-color: #1e7e34;
+  color: black;
+}
+
+/* Table */
+#sensorTable {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+#sensorTable th, #sensorTable td {
+  border: 1px solid #28a745;
+  padding: 8px;
+  text-align: center;
+}
+
+#sensorTable th {
+  background-color: #28a745;
+  color: #fff;
+}
+
+#sensorTable tbody tr:nth-child(even) {
+  background-color: #e6f4ea;
+}
+
+/* Pagination */
+#pagination .page-btn {
+  margin: 0 2px;
+}
+
+/* Modal */
+.modal-content {
+  border: 2px solid #28a745;
+}
+
+.modal-header, .modal-footer {
+  background-color: #e6f4ea;
+}
+
+.modal-title {
+  color: #155724;
+}
+
+.modal-body {
+  color: #155724;
+}
+
+@media (max-width: 768px) {
+ #sensorChart {
+   display: none !important;
+ }
+}

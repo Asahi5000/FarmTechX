@@ -1,0 +1,329 @@
+/* Reset and base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --primary-color: #217f44;
+}
+        
+body {
+    font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: #b10a0a;
+    min-height: 100vh;
+}
+       
+/* Layout components */
+.main-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+        
+.sidebar {
+background: linear-gradient(180deg, #35b665 0%, #217F44 100%);
+width: 250px;
+height: calc(100vh - 40px);
+border-bottom: 25px solid #fff;
+padding: 15px;
+display: flex;
+flex-direction: column;
+align-items: flex-start;
+position: fixed;
+top: 0;
+left: 0;
+overflow-y: auto;
+transition: transform 0.3s ease;
+z-index: 1000;
+margin-top: 10px;
+margin-left: 10px;
+border-radius: 15px;
+border-bottom-right-radius: 15px;
+border-bottom-left-radius: 15px;
+}
+
+/* Scrollbar */
+.sidebar::-webkit-scrollbar {
+width: 6px;
+}
+.sidebar::-webkit-scrollbar-thumb {
+background-color: rgba(0,0,0,0.3);
+border-radius: 6px;
+}
+.sidebar::-webkit-scrollbar-track {
+background: transparent;
+}
+
+/* Content wrapper */
+.sidebar .sidebar-content {
+width: 100%;
+max-width: 280px;
+display: flex;
+flex-direction: column;
+align-items: center;
+gap: 12px;
+}
+
+/* Profile section */
+.sidebar .profile-section {
+display: flex;
+flex-direction: column;
+align-items: center;
+margin-bottom: 40px;
+}
+.sidebar .profile-image {
+width: 60px;
+height: 60px;
+border-radius: 50px;
+margin-bottom: 20px;
+}
+.sidebar .sidebar-admin-text {
+font-size: 16px;
+font-weight: 400;
+color: #ffffff;
+text-align: center;
+}
+.sidebar .sidebar-admin-name {
+font-size: 24px;
+font-weight: 600;
+color: #ffffff;
+text-align: center;
+}
+
+/* Navigation menu */
+.sidebar .nav-menu {
+width: 100%;
+display: flex;
+flex-direction: column;
+gap: 16px;
+}
+.sidebar .nav-item {
+display: flex;
+align-items: center;
+padding: 16px 12px;
+border-radius: 8px;
+transition: all 0.3s ease;
+cursor: pointer;
+text-decoration: none;
+}
+.sidebar .nav-item:hover {
+background-color: rgba(255, 255, 255, 0.1);
+}
+.sidebar .nav-item.active {
+background-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Icons */
+.sidebar .nav-item i {
+margin-right: 16px;
+font-size: 40px;
+color: #ffffff;
+}
+
+/* Labels */
+.sidebar .nav-item span {
+font-size: 18px;
+font-weight: 600;
+color: #ffffff;
+}
+.sidebar .nav-item.dashboard span {
+color: #000000;
+}
+
+.main-content {
+    flex: 1;
+    padding: 16px;
+}
+        
+.content-wrapper {
+    max-width: 1100px;
+    margin: 0 auto;
+}
+        
+.welcome-card {
+    position: relative; /* allows absolute child positioning */
+    background-color: #ffffff;
+    border-radius: 30px;
+    padding: 20px 24px;
+    margin-bottom: 32px;
+    box-shadow: 0px 10px 4px rgba(0, 0, 0, 0.25);
+    overflow: hidden; /* keeps image inside the rounded border */
+}
+
+        
+.dashboard-title {
+    font-size: 28px;
+    font-weight: 600;
+    color: #217f44;
+    margin-bottom: 8px;
+}
+        
+.welcome-text {
+    font-size: 18px;
+    font-weight: 600;
+    color: #000000;
+}
+        
+.sensors-title {
+    font-size: 24px;
+    font-weight: 600;
+    color: #217f44;
+    margin: 32px 0 20px 0;
+}
+      
+.hamburger {
+    display: none;
+}
+
+.welcome-card .welcome-image {
+    position: absolute;
+    top: -20px;     /* spacing from top */
+    right: -10px;   /* spacing from right */
+    width: 400px;   /* resize */
+    height: auto;
+}
+        
+/* Responsive media queries */
+@media (min-width: 640px) {
+            
+    .dashboard-title {
+        font-size: 32px;
+    }
+            
+    .welcome-text {
+        font-size: 20px;
+    }
+            
+    .profile-image {
+        width: 80px;
+        height: 80px;
+    }
+            
+    .admin-text {
+        font-size: 18px;
+    }
+
+}
+        
+@media (min-width: 768px) {
+    .main-container {
+        flex-direction: row;
+    }
+            
+    .sidebar {
+        width: 280px;
+        min-height: 100vh;
+        position: fixed;
+        left: 0;
+        top: 0;
+    }
+            
+    .main-content {
+        margin-left: 280px;
+        padding: 24px;
+    }
+            
+    .dashboard-title {
+        font-size: 36px;
+    }
+            
+    .welcome-text {
+        font-size: 22px;
+    }
+            
+    .sensors-title {
+        font-size: 28px;
+    }
+            
+    .profile-image {
+        width: 100px;
+        height: 100px;
+    }
+            
+    .admin-text {
+        font-size: 16px;
+    }
+            
+    .nav-item span {
+        font-size: 20px;
+    }
+            
+    .nav-item img {
+        width: 32px;
+        height: 32px;
+    }
+}
+        
+@media (min-width: 1024px) {
+    .dashboard-title {
+        font-size: 40px;
+    }
+            
+    .welcome-text {
+        font-size: 25px;
+    }
+            
+    .nav-item span {
+        font-size: 25px;
+    }
+            
+    .nav-item img {
+        width: 40px;
+        height: 40px;
+    }
+}
+        
+@media (max-width: 767px) {
+    .sidebar {
+        position: fixed;
+        top: 0;
+        left: -100%;
+        width: 280px;
+        height: 100vh;
+        z-index: 1000;
+        transition: left 0.3s ease;
+    }
+            
+    .sidebar.open {
+        left: 0;
+    }
+            
+    .hamburger {
+        display: block;
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 1001;
+        background: #217f44;
+        border: none;
+        border-radius: 8px;
+        padding: 10px;
+        cursor: pointer;
+    }
+            
+    .hamburger span {
+        display: block;
+        width: 18px;
+        height: 2px;
+        background: white;
+        margin: 5px 0;
+        transition: 0.3s;
+    }
+            
+    .main-content {
+        margin-left: 0;
+        padding-top: 80px;
+    }
+
+    .welcome-card .welcome-image {
+        position: absolute;
+        top: -20px;     /* spacing from top */
+        right: -10px;   /* spacing from right */
+        width: 280px;   /* resize */
+        height: auto;
+    }
+  
+    }
+

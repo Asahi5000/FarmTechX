@@ -1,0 +1,90 @@
+    const modeToggle = document.getElementById('modeToggle');
+    const switchTitle = document.getElementById('switchTitle');
+    const manualMode = document.getElementById('manualMode');
+    const automationMode = document.getElementById('automationMode');
+    const scheduleForm = document.getElementById('scheduleForm');
+    const scheduleTable = document.getElementById('scheduleTable').querySelector('tbody');
+
+    // Load saved mode from localStorage
+    window.onload = () => {
+      const savedMode = localStorage.getItem('mode') || 'manual';
+      if(savedMode === 'automation'){
+        modeToggle.checked = true;
+        showAutomation();
+      } else {
+        modeToggle.checked = false;
+        showManual();
+      }
+    };
+
+    // Switch Mode
+    modeToggle.addEventListener('change', () => {
+      if (modeToggle.checked) {
+        showAutomation();
+        localStorage.setItem('mode','automation');
+      } else {
+        showManual();
+        localStorage.setItem('mode','manual');
+      }
+    });
+
+    function showAutomation(){
+      manualMode.style.display = 'none';
+      automationMode.style.display = 'block';
+      switchTitle.innerText = "Currently: Automation Mode";
+      document.querySelectorAll('.valve').forEach(v => v.classList.remove('on'));
+    }
+    function showManual(){
+      manualMode.style.display = 'block';
+      automationMode.style.display = 'none';
+      switchTitle.innerText = "Currently: Manual Mode";
+    }
+
+    // Manual Valve Toggle
+    function toggleValve(el){
+      el.classList.toggle('on');
+    }
+
+    // Add Automation Schedule
+    scheduleForm.addEventListener('submit', (e)=>{
+      e.preventDefault();
+      const valve = document.getElementById('valve').value;
+      let time = document.getElementById('time').value;
+      const duration = document.getElementById('duration').value;
+      const ph = parseFloat(document.getElementById('phAuto').value).toFixed(1);
+
+      if(!valve || !time) return;
+
+      // Convert to 12hr AM/PM
+      let [hour, minute] = time.split(":");
+      hour = parseInt(hour);
+      const ampm = hour >= 12 ? "PM" : "AM";
+      hour = hour % 12 || 12;
+      time = `${hour}:${minute} ${ampm}`;
+
+      // Prevent duplicate time
+      const exists = Array.from(scheduleTable.rows).some(r => r.cells[1].innerText === time);
+      if(exists){ alert("This time slot is already taken!"); return; }
+
+      const row = scheduleTable.insertRow();
+      row.insertCell(0).innerText = valve;
+      row.insertCell(1).innerText = time;
+      row.insertCell(2).innerText = duration + " min";
+      row.insertCell(3).innerText = ph;
+      const actions = row.insertCell(4);
+      actions.innerHTML = `<button class="action-btn edit" onclick="editRow(this)">Edit</button>
+                           <button class="action-btn" onclick="deleteRow(this)">Delete</button>`;
+      scheduleForm.reset();
+    });
+
+    function editRow(btn){
+      const row = btn.parentElement.parentElement;
+      document.getElementById('valve').value = row.cells[0].innerText;
+      document.getElementById('time').value = row.cells[1].innerText;
+      document.getElementById('duration').value = parseInt(row.cells[2].innerText);
+      document.getElementById('phAuto').value = row.cells[3].innerText;
+      row.remove();
+    }
+    function deleteRow(btn){
+      btn.parentElement.parentElement.remove();
+    }

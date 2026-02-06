@@ -1,0 +1,475 @@
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <ArduinoJson.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include <EEPROM.h>
+#include <time.h>
+
+// ================= PIN CONFIG =================
+#define ONE_WIRE_BUS 17
+#define TDS_PIN 34
+#define PH_PIN 36
+#define TDS_POWER 26
+#define PUMP_SSR 18
+#define RELAY_A 13
+#define RELAY_B 12
+#define RELAY_C 14
+
+// ================= WIFI CONFIG =================
+const char* ssid = "Abanes_2.4g";
+const char* password = "Chijedjoydred20";
+
+// ================= SERVER CONFIG =================
+const char* sensorAPI   = "http://192.168.1.11/FarmTechX/assets/php/api/save-temp.php";
+const char* scheduleAPI = "http://192.168.1.11/FarmTechX/assets/php/api/get-schedule.php";
+const char* markExecAPI = "http://192.168.1.11/FarmTechX/assets/php/api/mark-schedule.php";
+const char* dosingAPI   = "http://192.168.1.11/FarmTechX/assets/php/api/dosing-pump.php";
+const char* pumpAPI     = "http://192.168.1.11/FarmTechX/assets/php/api/pump-control.php";
+
+// ================= EEPROM =================
+#define EEPROM_SIZE 64
+float tdsCalibration = 1.138;
+
+// ================= DS18B20 =================
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature DS18B20(&oneWire);
+
+// ================= GLOBAL VARIABLES =================
+float temperature, tdsValue, ecValue, phValue;
+bool schedulePending = false;
+bool executedFlag = false;
+
+// Manual override flags (WEB)
+bool manualOverrideA = false;
+bool manualOverrideB = false;
+bool manualOverrideC = false;
+bool manualOverrideWater = false;
+
+#define TDS_SAMPLES 5
+#define PH_SAMPLES 20
+#define SENSOR_INTERVAL 10000
+#define SCHEDULE_INTERVAL 30000
+
+unsigned long lastSensorRead = 0;
+unsigned long lastScheduleCheck = 0;
+
+// ================ PH CALIBRATION =================
+const float PH_SLOPE  = -14.12;
+const float PH_OFFSET = 30.96;
+
+// ================= TIMINGS =================
+const unsigned long DOSING_TIME = 90000; // 9 seconds
+const unsigned long DELAY_BETWEEN_PUMPS_MINUTES = 4; // 4 minutes
+
+// ================= STATE MACHINE =================
+enum PumpState {
+  IDLE,
+  DOSING_C, DELAY_C, WAIT_AFTER_C,
+  DOSING_B, DELAY_B, WAIT_AFTER_B,
+  DOSING_A, DELAY_A, WAIT_AFTER_A,
+  WATER_PUMP, WATER_DELAY
+};
+PumpState currentState = IDLE;
+unsigned long stateStartTime = 0;
+
+// ================= SCHEDULE STRUCT =================
+struct Schedule {
+  int id;
+  int duration; // in minutes
+};
+Schedule activeSchedule;
+
+// ================= TRACK LAST EXECUTED =================
+int lastExecutedScheduleID = -1; // -1 means none executed yet
+
+// ================= WIFI CONNECT =================
+void connectWiFi() {
+  if (WiFi.status() == WL_CONNECTED) return;
+  Serial.print("Connecting to WiFi");
+  WiFi.begin(ssid, password);
+  int tries = 0;
+  while (WiFi.status() != WL_CONNECTED && tries < 20) {
+    delay(500);
+    Serial.print(".");
+    tries++;
+  }
+  Serial.println(WiFi.status() == WL_CONNECTED ? "\n✅ WiFi Connected" : "\n❌ WiFi Failed");
+}
+
+// ================= TIME =================
+void setupTime() {
+  configTime(8 * 3600, 0, "pool.ntp.org", "time.nist.gov");
+  struct tm timeinfo;
+  int retry = 0;
+  while (!getLocalTime(&timeinfo) && retry < 20) {
+    Serial.println("Waiting for NTP...");
+    delay(500);
+    retry++;
+  }
+  if (retry < 20)
+    Serial.printf("⏰ Time synced: %02d:%02d:%02d\n", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
+  else
+    Serial.println("⚠️ NTP failed");
+}
+
+// ================= PUMP CONTROL =================
+void startDosing(char p) { digitalWrite(p == 'A' ? RELAY_A : p == 'B' ? RELAY_B : RELAY_C, LOW); }
+void stopDosing(char p)  { digitalWrite(p == 'A' ? RELAY_A : p == 'B' ? RELAY_B : RELAY_C, HIGH); }
+void startWaterPump()    { digitalWrite(PUMP_SSR, LOW); }
+void stopWaterPump()     { digitalWrite(PUMP_SSR, HIGH); }
+
+// ================= MARK SCHEDULE =================
+void markScheduleExecuted(int id) {
+  Serial.println("Marking schedule ID: " + String(id));
+
+  unsigned long start = millis();
+  bool success = false;
+
+  while (!success && millis() - start < 30000UL) { // try up to 30 seconds
+    if (WiFi.status() != WL_CONNECTED) {
+      connectWiFi();
+      delay(1000);
+      continue;
+    }
+
+    HTTPClient http;
+    String url = String(markExecAPI) + "?id=" + String(id);
+    http.begin(url);
+    int httpCode = http.GET();
+    if (httpCode == 200) {
+      Serial.println("📌 Schedule marked executed for ID: " + String(id));
+      success = true;
+    } else {
+      Serial.println("❌ Failed to mark schedule, HTTP code: " + String(httpCode));
+    }
+    http.end();
+
+    if (!success) delay(2000); // wait 2 seconds before retry
+  }
+
+  if (!success) {
+    Serial.println("⚠️ Could not mark schedule after 30 seconds!");
+  } else {
+    executedFlag = true;
+  }
+}
+
+// ================= MANUAL OVERRIDE =================
+void checkManualFromServer() {
+  if (WiFi.status() != WL_CONNECTED) return;
+
+  HTTPClient http;
+  http.begin(dosingAPI);
+  int httpCode = http.GET();
+
+  if (httpCode == 200) {
+    String payload = http.getString();
+    DynamicJsonDocument doc(2048);
+
+    if (!deserializeJson(doc, payload)) {
+      for (JsonObject obj : doc.as<JsonArray>()) {
+        char pump = obj["pump"].as<String>()[0];
+        String state = obj["state"].as<String>();
+        bool isOn = (state == "ON");
+
+        if (pump == 'A') { isOn ? startDosing('A') : stopDosing('A'); }
+        if (pump == 'B') { isOn ? startDosing('B') : stopDosing('B'); }
+        if (pump == 'C') { isOn ? startDosing('C') : stopDosing('C'); }
+      }
+    }
+  }
+  http.end();
+
+  http.begin(pumpAPI);
+  if (http.GET() == 200) {
+    bool on = http.getString().indexOf("ON") >= 0;
+    if (on != manualOverrideWater) {
+      manualOverrideWater = on;
+      on ? startWaterPump() : stopWaterPump();
+      Serial.println(on ? "🌐 Water Pump ON" : "🌐 Water Pump OFF");
+    }
+  }
+  http.end();
+}
+
+// ================= READ SENSORS =================
+void readSensors() {
+  DS18B20.requestTemperatures();
+  temperature = DS18B20.getTempCByIndex(0);
+
+  digitalWrite(TDS_POWER,HIGH);
+  delay(500);
+  float tdsSum = 0;
+  for(int i=0;i<TDS_SAMPLES;i++){
+    int raw = analogRead(TDS_PIN);
+    float voltage = raw*3.3/4095.0;
+    float compensation = 1.0 + 0.02*(temperature-25.0);
+    float compensatedVoltage = voltage / compensation;
+    float tds = (133.42*pow(compensatedVoltage,3)
+               - 255.86*pow(compensatedVoltage,2)
+               + 857.39*compensatedVoltage)*0.5;
+    tdsSum += tds;
+    delay(50);
+  }
+  tdsValue = (tdsSum/TDS_SAMPLES) * tdsCalibration;
+  ecValue = tdsValue / 500.0;
+  digitalWrite(TDS_POWER,LOW);
+
+  float phSum = 0;
+  for(int i=0;i<PH_SAMPLES;i++){
+    phSum += analogRead(PH_PIN) * 3.3 / 4095.0;
+    delay(50);
+  }
+  float voltageAvg = phSum / PH_SAMPLES;
+  phValue = PH_SLOPE * voltageAvg + PH_OFFSET;
+
+  Serial.printf("Temp: %.2f °C | TDS: %.2f ppm | EC: %.2f | pH: %.2f\n",
+    temperature, tdsValue, ecValue, phValue
+  );
+
+  if(WiFi.status() == WL_CONNECTED){
+    HTTPClient http;
+    http.begin(sensorAPI);
+    http.addHeader("Content-Type","application/x-www-form-urlencoded");
+    String postData =
+        "temperature=" + String(temperature,2)
+      + "&tds=" + String(tdsValue,2)
+      + "&ec=" + String(ecValue,2)
+      + "&ph=" + String(phValue,2);
+    http.POST(postData);
+    http.end();
+  }
+}
+
+// ================= CHECK SOIL & RAIN =================
+bool checkSoilRain() {
+  if (WiFi.status() != WL_CONNECTED) return false;
+
+  float moisture = 0;
+  int isRaining = 0;
+
+  // Soil
+  HTTPClient http;
+  http.begin("http://192.168.1.11/FarmTechX/assets/php/api/soil-read.php");
+  int code = http.GET();
+  if (code == 200) {
+    DynamicJsonDocument doc(1024);
+    deserializeJson(doc, http.getString());
+    moisture = doc["moisture"];
+    Serial.println("🌱 Soil moisture: " + String(moisture));
+  }
+  http.end();
+
+  // Rain
+  http.begin("http://192.168.1.11/FarmTechX/assets/php/api/rain-read.php");
+  code = http.GET();
+  if (code == 200) {
+    DynamicJsonDocument doc(1024);
+    deserializeJson(doc, http.getString());
+    isRaining = doc["is_raining"];
+    Serial.println("☔ Is raining: " + String(isRaining));
+  }
+  http.end();
+
+  if (moisture >= 50 || isRaining == 1) {
+    Serial.println("⚠️ Moisture or rain detected, cannot run automation");
+    return false;
+  }
+
+  return true;
+}
+
+// ================= SCHEDULE =================
+void checkWaterSchedules() {
+  if (WiFi.status() != WL_CONNECTED) return;
+  struct tm t;
+  if (!getLocalTime(&t)) return;
+
+  int nowMin = t.tm_hour * 60 + t.tm_min;
+
+  HTTPClient http;
+  http.begin(scheduleAPI);
+  if (http.GET() == 200) {
+    DynamicJsonDocument doc(8192);
+    deserializeJson(doc, http.getString());
+    for (JsonObject s : doc["data"].as<JsonArray>()) {
+      int hour = s["hour"];
+      int min  = s["minute"];
+      String ap = s["ampm"];
+      if (ap == "PM" && hour < 12) hour += 12;
+      if (ap == "AM" && hour == 12) hour = 0;
+
+      int schedMin = hour * 60 + min;
+      int scheduleID = s["id"];
+
+      if (abs(nowMin - schedMin) <= 1 && scheduleID != lastExecutedScheduleID) {
+        if (!checkSoilRain()) {
+          markScheduleExecuted(scheduleID);
+          lastExecutedScheduleID = scheduleID;
+          return;
+        }
+
+        activeSchedule.id = scheduleID;
+        activeSchedule.duration = s["duration"];
+        schedulePending = true;
+        executedFlag = false;
+        currentState = DOSING_C;
+        stateStartTime = millis();
+        lastExecutedScheduleID = scheduleID;
+        Serial.println("🚀 Automation started for schedule ID: " + String(scheduleID));
+        break;
+      }
+    }
+  }
+  http.end();
+}
+
+// ================= STATE MACHINE =================
+void processPumpState() {
+  if (!schedulePending) return;
+
+  // Mid-run soil/rain check
+  if (!checkSoilRain()) {
+    Serial.println("⚠️ Automation suspended mid-run due to moisture/rain");
+    stopDosing('A'); stopDosing('B'); stopDosing('C'); stopWaterPump();
+    schedulePending = false;
+    currentState = IDLE;
+    markScheduleExecuted(activeSchedule.id);
+    return;
+  }
+
+  unsigned long now = millis();
+
+  switch (currentState) {
+    case DOSING_C:
+      if (!manualOverrideC) startDosing('C');
+      stateStartTime = now;
+      currentState = DELAY_C;
+      Serial.println("💧 DOSING C started");
+      break;
+
+    case DELAY_C:
+      if (now - stateStartTime >= DOSING_TIME) {
+        if (!manualOverrideC) stopDosing('C');
+        stateStartTime = now;
+        currentState = WAIT_AFTER_C;
+        Serial.println("⏳ DOSING C finished, waiting " + String(DELAY_BETWEEN_PUMPS_MINUTES) + " min");
+      }
+      break;
+
+    case WAIT_AFTER_C:
+      if (now - stateStartTime >= DELAY_BETWEEN_PUMPS_MINUTES * 60000UL) {
+        currentState = DOSING_B;
+        Serial.println("💧 Starting DOSING B");
+      }
+      break;
+
+    case DOSING_B:
+      if (!manualOverrideB) startDosing('B');
+      stateStartTime = now;
+      currentState = DELAY_B;
+      Serial.println("💧 DOSING B started");
+      break;
+
+    case DELAY_B:
+      if (now - stateStartTime >= DOSING_TIME) {
+        if (!manualOverrideB) stopDosing('B');
+        stateStartTime = now;
+        currentState = WAIT_AFTER_B;
+        Serial.println("⏳ DOSING B finished, waiting " + String(DELAY_BETWEEN_PUMPS_MINUTES) + " min");
+      }
+      break;
+
+    case WAIT_AFTER_B:
+      if (now - stateStartTime >= DELAY_BETWEEN_PUMPS_MINUTES * 60000UL) {
+        currentState = DOSING_A;
+        Serial.println("💧 Starting DOSING A");
+      }
+      break;
+
+    case DOSING_A:
+      if (!manualOverrideA) startDosing('A');
+      stateStartTime = now;
+      currentState = DELAY_A;
+      Serial.println("💧 DOSING A started");
+      break;
+
+    case DELAY_A:
+      if (now - stateStartTime >= DOSING_TIME) {
+        if (!manualOverrideA) stopDosing('A');
+        stateStartTime = now;
+        currentState = WAIT_AFTER_A;
+        Serial.println("⏳ DOSING A finished, waiting " + String(DELAY_BETWEEN_PUMPS_MINUTES) + " min");
+      }
+      break;
+
+    case WAIT_AFTER_A:
+      if (now - stateStartTime >= DELAY_BETWEEN_PUMPS_MINUTES * 60000UL) {
+        currentState = WATER_PUMP;
+        stateStartTime = now;
+        Serial.println("💦 Starting WATER PUMP for " + String(activeSchedule.duration) + " min");
+      }
+      break;
+
+    case WATER_PUMP:
+      if (!manualOverrideWater) startWaterPump();
+      currentState = WATER_DELAY;
+      break;
+
+    case WATER_DELAY:
+      if (now - stateStartTime >= activeSchedule.duration * 60000UL) {
+        if (!manualOverrideWater) stopWaterPump();
+        schedulePending = false;
+        currentState = IDLE;
+        markScheduleExecuted(activeSchedule.id);
+        Serial.println("✅ Automation finished for schedule ID: " + String(activeSchedule.id));
+      }
+      break;
+
+    default: break;
+  }
+}
+
+// ================= SETUP =================
+void setup() {
+  Serial.begin(115200);
+  pinMode(TDS_POWER, OUTPUT);
+  pinMode(PUMP_SSR, OUTPUT);
+  pinMode(RELAY_A, OUTPUT);
+  pinMode(RELAY_B, OUTPUT);
+  pinMode(RELAY_C, OUTPUT);
+
+  digitalWrite(TDS_POWER, LOW);
+  digitalWrite(PUMP_SSR, HIGH);
+  digitalWrite(RELAY_A, HIGH);
+  digitalWrite(RELAY_B, HIGH);
+  digitalWrite(RELAY_C, HIGH);
+
+  DS18B20.begin();
+  connectWiFi();
+  setupTime();
+}
+
+// ================= LOOP =================
+void loop() {
+  connectWiFi();
+
+  if (millis() - lastSensorRead > SENSOR_INTERVAL) {
+    lastSensorRead = millis();
+    readSensors();
+  }
+
+  if (millis() - lastScheduleCheck > SCHEDULE_INTERVAL) {
+    lastScheduleCheck = millis();
+    checkWaterSchedules();
+  }
+
+  processPumpState();
+
+  static unsigned long lastWeb = 0;
+  if (millis() - lastWeb > 1500) {
+    lastWeb = millis();
+    checkManualFromServer();
+  }
+}
