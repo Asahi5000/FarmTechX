@@ -14,7 +14,7 @@ session_start();
 </head>
 <body>
   <div class="login-container">
-    <img src="/FarmTechX/assets/images/company-logo.jpg" alt="FarmTechX Logo" class="logo" />
+    <img src="/assets/images/company-logo.jpg" alt="FarmTechX Logo" class="logo" />
     <h2>FarmTechX Login</h2>
     <form action="login.php" method="post">
       <div class="input-group">
